@@ -1,0 +1,26 @@
+{% extends "base.py.jinja" %}
+
+{% block imports %}
+{{ super() }}
+from typing import Annotated
+from pydantic import BaseModel, Field
+{% endblock %}
+
+{% block body %}
+{% for t in spec.types %}
+
+{% if t.is_union %}
+
+{# type FooBarUnion = Annotated[Foo | Bar, Field(discriminator="status")] #}
+type {{ t.name }} = {{ t.subtypes | join(" | ")}}
+
+{% else %}
+
+class {{ t.name }}(BaseModel):
+    """{{ t.description }}"""
+    pass
+
+{% endif %}
+
+{% endfor %}
+{% endblock %}
