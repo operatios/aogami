@@ -3,4 +3,5 @@ __pycache__/
 .venv/
 .ruff_cache/
 .env
+
 api.min.json

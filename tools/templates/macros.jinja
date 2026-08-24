@@ -1,0 +1,28 @@
+{% macro render_field(type, field) %}
+{%- if field.literal is not none -%}
+    {%- set value = field.literal -%}
+{%- elif not field.required -%}
+    {%- set value = "None" -%}
+{%- endif -%}
+
+{%- set args = [] -%}
+
+{# Message.date is a special case #}
+{%- if type.name == "Message" and field.name == "date" -%}
+    {%- set args = args + ["gt=0"] -%}
+{%- endif -%}
+
+{%- if field.name != field.alias -%}
+    {%- set args = args + ['alias="' ~ field.name ~ '"'] -%}
+{%- endif -%}
+
+{%- if args -%}
+= Field({{ value ~ ", " if value is defined else "" }}{{ args | join(", ") }})
+{%- elif value is defined -%}
+= {{ value }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro render_docstring(string) -%}
+"""{{ string | replace('"', "'") | wordwrap | indent }}"""
+{%- endmacro %}

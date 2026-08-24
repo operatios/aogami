@@ -1,26 +1,34 @@
-{% extends "base.py.jinja" %}
+{% import "macros.jinja" as macros %}
+{% include "header.py.jinja" %}
 
-{% block imports %}
-{{ super() }}
-from typing import Annotated
-from pydantic import BaseModel, Field
-{% endblock %}
 
-{% block body %}
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class TelegramObject(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
 {% for t in spec.types %}
 
-{% if t.is_union %}
+    {% if t.is_union %}
+        {% set discriminator = spec.find_union_discriminator(t.subtypes) %}
+        {% set type_annotation = t.subtypes | join(" | ") %}
+        {% if discriminator %}
+type {{ t.name }} = Annotated[{{ type_annotation }}, Field(discriminator="{{ discriminator }}")]
+        {% else %}
+type {{ t.name }} = {{ type_annotation }}
+        {% endif %}
 
-{# type FooBarUnion = Annotated[Foo | Bar, Field(discriminator="status")] #}
-type {{ t.name }} = {{ t.subtypes | join(" | ")}}
+    {% else %}
+class {{ t.name }}(TelegramObject):
+    {{ macros.render_docstring(t.description) }}
 
-{% else %}
+        {% for f in t.fields %}
+    {{ f.alias }}: {{ f.type_annotation }} {{ macros.render_field(t, f) }}
+    {{ macros.render_docstring(f.description) }}
 
-class {{ t.name }}(BaseModel):
-    """{{ t.description }}"""
-    pass
-
-{% endif %}
-
+        {% endfor %}
+    {% endif %}
 {% endfor %}
-{% endblock %}
