@@ -20,7 +20,7 @@ SPEC_URL = "https://raw.githubusercontent.com/PaulSonOfLars/telegram-bot-api-spe
 
 BASE_DIR = Path(__file__).parent
 TEMPLATES_DIR = BASE_DIR / "templates"
-OUTPUT_DIR = BASE_DIR / "generated"
+OUTPUT_DIR = BASE_DIR.parent / "src/aogami"
 
 SPEC_FILE = BASE_DIR / "api.min.json"
 
@@ -51,7 +51,7 @@ class BaseInfo(BaseModel):
 
     name: str
     href: HttpUrl
-    description: Annotated[str, BeforeValidator(lambda x: " ".join(x))]
+    description: Annotated[str | None, BeforeValidator(lambda x: " ".join(x))] = None
     fields: list[FieldInfo] = []
 
 
@@ -61,7 +61,7 @@ class FieldInfo(BaseModel):
     name: str
     required: bool
     description: Annotated[str, BeforeValidator(lambda x: x.removeprefix("Optional. "))]
-    types: Annotated[list[str], BeforeValidator(convert_types)]
+    types: Annotated[list[str], BeforeValidator(convert_types)] = []
 
     @cached_property
     def literal(self) -> str | None:
@@ -113,7 +113,11 @@ class TypeInfo(BaseInfo):
 
 
 class MethodInfo(BaseInfo):
-    returns: list[str]
+    returns: Annotated[list[str], BeforeValidator(convert_types)]
+
+    @property
+    def sorted_fields(self) -> list[FieldInfo]:
+        return sorted(self.fields, key=lambda f: not f.required)
 
 
 def flatten_dict[T](value: dict[str, T]) -> list[T]:
@@ -195,7 +199,6 @@ def main() -> None:
         trim_blocks=True,
         lstrip_blocks=True,
     )
-
     env.filters["to_snake_case"] = to_snake_case
 
     OUTPUT_DIR.mkdir(exist_ok=True)
@@ -203,9 +206,11 @@ def main() -> None:
     for name in ("types.py.jinja", "methods.py.jinja"):
         template = env.get_template(name)
         code = template.render(spec=spec)
-        (OUTPUT_DIR / Path(name).stem).write_text(code)
+        path = OUTPUT_DIR / Path(name).stem
+        path.write_text(code)
 
-    subprocess.run(["ruff", "format", OUTPUT_DIR], check=True)
+        subprocess.run(["ruff", "check", "--fix", path], check=True)
+        subprocess.run(["ruff", "format", path], check=True)
 
 
 if __name__ == "__main__":

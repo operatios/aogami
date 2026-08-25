@@ -23,6 +23,28 @@
 {%- endif -%}
 {%- endmacro %}
 
-{% macro render_docstring(string) -%}
-"""{{ string | replace('"', "'") | wordwrap | indent }}"""
+{% set MAX_LINE_LENGTH = 88 %}
+
+{% macro to_docstring(string, indent) -%}
+{{ string | replace('"', "'") | wordwrap(MAX_LINE_LENGTH - indent) }}
+{%- endmacro %}
+
+{% macro render_description(string, indent) -%}
+"""
+{{ to_docstring(string, indent) }}
+"""
+{%- endmacro %}
+
+
+{% macro render_method_docstring(method, indent) -%}
+"""
+{{ to_docstring(method.description, indent) }}
+
+{% if method.fields %}
+Args:
+{% for f in method.sorted_fields %}
+    {{ to_docstring("{} ({}): {}".format(f.name, f.type_annotation, f.description), 16) | indent(8) }}
+{% endfor %}
+{% endif %}
+"""
 {%- endmacro %}
