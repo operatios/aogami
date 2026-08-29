@@ -1,0 +1,2 @@
+# THIS FILE IS AUTO-GENERATED. DO NOT EDIT!
+# ${spec.version} (${spec.release_date})

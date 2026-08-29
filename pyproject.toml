@@ -8,12 +8,11 @@ authors = [{ name = "operatios" }]
 dependencies = [
   "httpx2[socks]>=2.10.0",
   "pydantic>=2.13.4",
-  "pydantic-settings>=2.15.0",
 ]
 
 [dependency-groups]
 dev = [
-  "jinja2>=3.1.6",
+  "mako>=1.4.1",
   "pydantic-settings>=2.15.0",
   "pytest>=9.1.1",
   "pytest-asyncio>=1.4.0",
