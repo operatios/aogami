@@ -27,19 +27,9 @@
 <%include file="header.py.mako"/>
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ReprArgs
+from pydantic import Field
 
-
-class TelegramObject(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-
-class Response[T](TelegramObject):
-    ok: bool
-    result: T | None = None
-    error_code: int | None = None
-    description: str | None = None
-    parameters: ResponseParameters | None = None
+from aogami.types_manual import InputFile, TelegramObject
 % for t in spec.types.values():
 
 

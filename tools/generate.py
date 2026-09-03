@@ -37,13 +37,16 @@ logger = logging.getLogger(__name__)
 
 
 def wrap_paragraphs(
-    paragraphs: list[str], initial_indent: str = "", subsequent_indent: str = ""
+    paragraphs: list[str],
+    initial_indent: str = "",
+    subsequent_indent: str = "",
+    width: int = DOCSTRING_WIDTH,
 ) -> Generator[str]:
 
     for p in paragraphs:
         yield textwrap.fill(
             p,
-            DOCSTRING_WIDTH - len(initial_indent),
+            width,
             initial_indent=initial_indent,
             subsequent_indent=subsequent_indent,
         )
@@ -170,8 +173,13 @@ class FieldInfo(BaseModel):
             return f"Literal[{self.literal}]"
 
         types = self.types
+
         if not self.required:
             types = [*types, "None"]
+
+        if "InputFile" not in types and "attach://" in self.description:
+            # InputFile is first to remain consistent with docs: "InputFile or String"
+            types = ["InputFile", *types]
 
         return " | ".join(types)
 
@@ -229,6 +237,8 @@ def get_spec() -> str:
 
 def main() -> None:
     spec = APISpec.model_validate_json(get_spec())
+    # We use a manually defined InputFile type
+    spec.types.pop("InputFile", None)
 
     OUTPUT_DIR.mkdir(exist_ok=True)
 

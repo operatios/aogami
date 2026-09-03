@@ -6,6 +6,7 @@ from aogami.types import (
     ${name},
 % endfor
 )
+from aogami.types_manual import InputFile
 
 
 class TelegramMethods:
