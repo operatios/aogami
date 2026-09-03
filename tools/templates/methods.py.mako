@@ -2,11 +2,11 @@
 from typing_extensions import TypeForm
 
 from aogami.types import (
+    InputFile,
 % for name in spec.types:
     ${name},
 % endfor
 )
-from aogami.types_manual import InputFile
 
 
 class TelegramMethods:
@@ -22,18 +22,21 @@ class TelegramMethods:
         % if m.fields:
         *,
         % for f in m.sorted_fields:
-        ${f.name}: ${f.type_hint}${" = None" if not f.required else ""},
+        ${f.python_name}: ${f.type_hint}${" = None" if not f.required else ""},
         % endfor
         % endif
     ) -> ${m.type_hint}:
         """
 ${m.get_docstring()}
         """
+        params = {
+            % for f in m.fields:
+            "${f.name}": ${f.python_name},
+            % endfor
+        }
         return await self.method(
             "${m.name}",
             ${m.type_hint},
-            % for f in m.fields:
-            ${f.name}=${f.name},
-            % endfor
+            **params
         )
 % endfor

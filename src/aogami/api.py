@@ -2,26 +2,35 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from functools import cache
 from types import TracebackType
-from typing import Final, Self
+from typing import Annotated, Final, Literal, Self, cast
 
-from pydantic import SecretStr, TypeAdapter
+from pydantic import Field, SecretStr, TypeAdapter
 from typing_extensions import TypeForm
 
 from aogami.exceptions import TelegramError
 from aogami.methods import TelegramMethods
 from aogami.transport import FileTypes, HttpxTransport
-from aogami.types import ResponseParameters, TelegramObject
-from aogami.types_manual import InputFile
+from aogami.types import InputFile, ResponseParameters, TelegramObject
 
 PARAM_ADAPTER: Final = TypeAdapter(object)
 
 
-class Response[T](TelegramObject):
-    ok: bool
-    result: T | None = None
-    error_code: int | None = None
+class ResponseOk[T](TelegramObject):
+    ok: Literal[True] = Field(True, exclude=True)
+
+    result: T
     description: str | None = None
+
+
+class ResponseErr(TelegramObject):
+    ok: Literal[False] = Field(False, exclude=True)
+
+    error_code: int
+    description: str
     parameters: ResponseParameters | None = None
+
+
+type Response[T] = Annotated[ResponseOk[T] | ResponseErr, Field(discriminator="ok")]
 
 
 @cache
@@ -33,7 +42,7 @@ def get_type_adapter[T](type_: TypeForm[T]) -> TypeAdapter[Response[T]]:
 def extract_files(value: object, files: dict[str, FileTypes]) -> None:
     if isinstance(value, InputFile):
         if value.filename:
-            files[value.id] = value.filename, value.content
+            files[value.id] = value.filename, value.content, value.content_type
         else:
             files[value.id] = value.content
 
@@ -120,15 +129,15 @@ class TelegramAPI(TelegramMethods):
             **asdict(req),
         )
 
-        # @cache erases the return type, so we have to manually set the type hint
-        adapter: TypeAdapter[Response[T]] = get_type_adapter(returns)
+        # TODO: remove cast if this false positive is fixed upstream
+        # We have to cast here since @cache destroys the function signature
+        adapter = cast(TypeAdapter[Response[T]], get_type_adapter(returns))
+
         resp = adapter.validate_json(http_resp.content)
 
         # TODO: handle 429
         if not resp.ok:
-            raise TelegramError(resp.error_code, resp.description, resp.parameters)
-
-        assert resp.result is not None
+            raise TelegramError(**resp.model_dump())
 
         return resp.result
 

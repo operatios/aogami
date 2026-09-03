@@ -28,11 +28,12 @@ class HttpxTransport:
         headers: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> HttpxResponse:
+
         return await self.client.post(
             url,
             content=content,
             data=data,
             files=files,
             headers=headers,
-            timeout=timeout or self.client.timeout,
+            timeout=timeout if timeout is not None else self.client.timeout,
         )
