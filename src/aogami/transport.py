@@ -2,10 +2,7 @@ from collections.abc import Mapping
 
 from httpx2 import AsyncClient
 from httpx2 import Response as HttpxResponse
-from httpx2._types import FileTypes as _FileTypes
-from httpx2._types import RequestContent, RequestData, RequestFiles
-
-FileTypes = _FileTypes
+from httpx2._types import FileTypes, RequestContent, RequestData
 
 
 class HttpxTransport:
@@ -24,7 +21,7 @@ class HttpxTransport:
         *,
         content: RequestContent | None = None,
         data: RequestData | None = None,
-        files: RequestFiles | None = None,
+        files: Mapping[str, FileTypes] | None = None,
         headers: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> HttpxResponse:
@@ -37,3 +34,6 @@ class HttpxTransport:
             headers=headers,
             timeout=timeout if timeout is not None else self.client.timeout,
         )
+
+    async def get(self, url: str) -> HttpxResponse:
+        return await self.client.get(url)

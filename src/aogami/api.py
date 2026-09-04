@@ -111,7 +111,6 @@ class TelegramAPI(TelegramMethods):
 
         params = {k: v for k, v in params.items() if v is not None}
 
-        # TODO: see AsyncClient.build_request()
         req = RequestArgs()
         extract_files(params.values(), req.files)
 
@@ -140,6 +139,17 @@ class TelegramAPI(TelegramMethods):
             raise TelegramError(**resp.model_dump())
 
         return resp.result
+
+    async def download(self, file_id: str) -> bytes:
+        file = await self.get_file(file_id=file_id)
+        assert file.file_path
+
+        http_resp = await self.transport.get(
+            f"/file/bot{self.token.get_secret_value()}/{file.file_path}"
+        )
+        http_resp.raise_for_status()
+
+        return http_resp.content
 
     async def __aenter__(self) -> Self:
         return self

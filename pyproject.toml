@@ -1,7 +1,7 @@
 [project]
 name = "aogami"
 version = "0.1.0"
-description = "Strongly-typed Telegram Bot API framework"
+description = "Type-safe Telegram Bot API framework"
 readme = "README.md"
 requires-python = ">=3.14"
 authors = [{ name = "operatios" }]
