@@ -16,6 +16,7 @@ from pydantic import (
     HttpUrl,
     model_validator,
 )
+from tap import Tap
 
 SPEC_URL: Final = "https://raw.githubusercontent.com/PaulSonOfLars/telegram-bot-api-spec/main/api.min.json"
 
@@ -222,8 +223,8 @@ class APISpec(BaseModel):
                 return escape_keyword(discriminator)
 
 
-def get_spec() -> str:
-    if SPEC_FILE.exists():
+def get_spec(refresh: bool = False) -> str:
+    if SPEC_FILE.exists() and not refresh:
         return SPEC_FILE.read_text()
 
     resp = httpx2.get(SPEC_URL)
@@ -235,8 +236,13 @@ def get_spec() -> str:
     return spec
 
 
-def main() -> None:
-    spec = APISpec.model_validate_json(get_spec())
+class Args(Tap):
+    refresh: bool = False  # refresh cached spec
+    no_ruff: bool = False  # don't use ruff on generated code
+
+
+def main(args: Args) -> None:
+    spec = APISpec.model_validate_json(get_spec(args.refresh))
     # We use a manually defined InputFile type
     spec.types.pop("InputFile", None)
 
@@ -254,9 +260,10 @@ def main() -> None:
         path = OUTPUT_DIR / Path(filename).stem
         path.write_text(code)
 
-        subprocess.run(["ruff", "check", "--fix", path], check=True)
-        subprocess.run(["ruff", "format", path], check=True)
+        if not args.no_ruff:
+            subprocess.run(["ruff", "check", "--fix", path], check=True)
+            subprocess.run(["ruff", "format", path], check=True)
 
 
 if __name__ == "__main__":
-    main()
+    main(Args(underscores_to_dashes=True).parse_args())
