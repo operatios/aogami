@@ -1,46 +1,36 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
-from functools import cache
 from types import TracebackType
-from typing import Annotated, Final, Literal, Self, cast
+from typing import Final, Self, cast
 
-from pydantic import Field, SecretStr, TypeAdapter
+import pydantic
+from pydantic import SecretStr, TypeAdapter
 from typing_extensions import TypeForm
 
-from aogami.exceptions import TelegramError
+from aogami.exceptions import (
+    DownloadError,
+    InputFileTooLarge,
+    ValidationError,
+    get_api_error,
+)
 from aogami.methods import TelegramMethods
+from aogami.response import Response, get_type_adapter
 from aogami.transport import FileTypes, HttpxTransport
-from aogami.types import InputFile, ResponseParameters, TelegramObject
-
-PARAM_ADAPTER: Final = TypeAdapter(object)
+from aogami.types import InputFile, TelegramObject
 
 
-class ResponseOk[T](TelegramObject):
-    ok: Literal[True] = Field(True, exclude=True)
+def extract_files(
+    value: object, files: dict[str, FileTypes], limit_mb: int = 50
+) -> None:
 
-    result: T
-    description: str | None = None
-
-
-class ResponseErr(TelegramObject):
-    ok: Literal[False] = Field(False, exclude=True)
-
-    error_code: int
-    description: str
-    parameters: ResponseParameters | None = None
-
-
-type Response[T] = Annotated[ResponseOk[T] | ResponseErr, Field(discriminator="ok")]
-
-
-@cache
-def get_type_adapter[T](type_: TypeForm[T]) -> TypeAdapter[Response[T]]:
-    # TODO: stop ignoring once this false positive is fixed upstream
-    return TypeAdapter(Response[type_])  # ty: ignore[invalid-type-form]
-
-
-def extract_files(value: object, files: dict[str, FileTypes]) -> None:
     if isinstance(value, InputFile):
+        # TODO: photos have a separate limit
+        max_size = limit_mb * (1000**2)
+        if len(value.content) > max_size:
+            raise InputFileTooLarge(
+                message=f"File is too big (>{limit_mb} MB)", input_file=value
+            )
+
         if value.filename:
             files[value.id] = value.filename, value.content, value.content_type
         else:
@@ -48,13 +38,18 @@ def extract_files(value: object, files: dict[str, FileTypes]) -> None:
 
     elif isinstance(value, TelegramObject):
         for _, field_value in value:
-            extract_files(field_value, files)
+            extract_files(field_value, files, limit_mb)
+
+    elif isinstance(value, Mapping):
+        for v in value.values():
+            extract_files(v, files, limit_mb)
 
     elif isinstance(value, Iterable) and not isinstance(value, str | bytes):
         for i in value:
-            extract_files(i, files)
+            extract_files(i, files, limit_mb)
 
 
+PARAM_ADAPTER: Final = TypeAdapter(object)
 JsonScalar = str | int | float | bool | None
 
 
@@ -84,7 +79,7 @@ def get_timeout_with_padding(
     return None
 
 
-@dataclass
+@dataclass(slots=True)
 class RequestArgs:
     content: bytes | None = None
     data: dict[str, JsonScalar] | None = None
@@ -112,6 +107,7 @@ class TelegramAPI(TelegramMethods):
         params = {k: v for k, v in params.items() if v is not None}
 
         req = RequestArgs()
+        # TODO: set larger limit if we're using a local Bot API server
         extract_files(params.values(), req.files)
 
         if req.files:
@@ -132,26 +128,33 @@ class TelegramAPI(TelegramMethods):
         # We have to cast here since @cache destroys the function signature
         adapter = cast(TypeAdapter[Response[T]], get_type_adapter(returns))
 
-        resp = adapter.validate_json(http_resp.content)
+        try:
+            resp = adapter.validate_json(http_resp.content)
+        except pydantic.ValidationError as exc:
+            raise ValidationError(
+                message="Telegram API response does not match the expected schema",
+                status_code=http_resp.status_code,
+                content=http_resp.content,
+                exc=exc,
+            ) from exc
 
-        # TODO: handle 429
         if not resp.ok:
-            raise TelegramError(**resp.model_dump())
+            raise get_api_error(resp)
 
         return resp.result
 
     async def download(self, file_id: str) -> bytes:
         file = await self.get_file(file_id=file_id)
-        assert file.file_path
+        if not file.file_path:
+            raise DownloadError("File path missing from file", file=file)
 
-        http_resp = await self.transport.get(
+        return await self.transport.download(
             f"/file/bot{self.token.get_secret_value()}/{file.file_path}"
         )
-        http_resp.raise_for_status()
-
-        return http_resp.content
 
     async def __aenter__(self) -> Self:
+        if self.transport.is_closed:
+            raise RuntimeError(f"{self.__class__.__name__}'s transport is closed")
         return self
 
     async def __aexit__(
@@ -159,5 +162,5 @@ class TelegramAPI(TelegramMethods):
         exc_type: type[BaseException] | None,
         exc: BaseException | None,
         tb: TracebackType | None,
-    ) -> None:
+    ) -> bool | None:
         await self.transport.aclose()
