@@ -239,12 +239,16 @@ def get_spec(refresh: bool = False) -> str:
 class Args(Tap):
     refresh: bool = False  # refresh cached spec
     no_ruff: bool = False  # don't use ruff on generated code
+    stats: bool = False  # show stats
 
 
 def main(args: Args) -> None:
     spec = APISpec.model_validate_json(get_spec(args.refresh))
     # We use a manually defined InputFile type
     spec.types.pop("InputFile", None)
+
+    if args.stats:
+        print(f"Type count: {len(spec.types)}, method count: {len(spec.methods)}")
 
     OUTPUT_DIR.mkdir(exist_ok=True)
 
