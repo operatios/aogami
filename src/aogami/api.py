@@ -3,7 +3,6 @@ from dataclasses import asdict, dataclass, field
 from types import TracebackType
 from typing import Final, Self, cast
 
-import pydantic
 from pydantic import SecretStr, TypeAdapter
 from typing_extensions import TypeForm
 
@@ -69,14 +68,13 @@ def build_form_data(params: dict[str, object]) -> dict[str, JsonScalar]:
     return form_data
 
 
-def get_timeout_with_padding(
-    params: dict[str, object], padding: float = 5.0
-) -> float | None:
-    timeout = params.get("timeout")
-    if isinstance(timeout, int | float):
-        return timeout + padding
+def get_timeout(params: dict[str, object]) -> float:
+    timeout = params.get("timeout", 0.0)
 
-    return None
+    if isinstance(timeout, int | float):
+        return timeout
+
+    raise RuntimeError(f"Invalid timeout type: {type(timeout)}")
 
 
 @dataclass(slots=True)
@@ -85,7 +83,7 @@ class RequestArgs:
     data: dict[str, JsonScalar] | None = None
     files: dict[str, FileTypes] = field(default_factory=dict)
     headers: dict[str, str] | None = None
-    timeout: float | None = None
+    extra_read_timeout: float | None = None
 
 
 class TelegramAPI(TelegramMethods):
@@ -105,19 +103,21 @@ class TelegramAPI(TelegramMethods):
     ) -> T:
 
         params = {k: v for k, v in params.items() if v is not None}
-
         req = RequestArgs()
-        # TODO: set larger limit if we're using a local Bot API server
+
+        # TODO: set larger limit if we're using a Local Bot API server
         extract_files(params.values(), req.files)
 
         if req.files:
+            # When uploading files, request params are sent as form data
             req.data = build_form_data(params)
         else:
+            # Send params as JSON body
             req.content = PARAM_ADAPTER.dump_json(params, exclude_none=True)
             req.headers = {"Content-Type": "application/json"}
 
         if name == "getUpdates":
-            req.timeout = get_timeout_with_padding(params)
+            req.extra_read_timeout = get_timeout(params)
 
         http_resp = await self.transport.post(
             url=f"/bot{self.token.get_secret_value()}/{name}",
@@ -130,7 +130,7 @@ class TelegramAPI(TelegramMethods):
 
         try:
             resp = adapter.validate_json(http_resp.content)
-        except pydantic.ValidationError as exc:
+        except ValidationError as exc:
             raise ValidationError(
                 message="Telegram API response does not match the expected schema",
                 status_code=http_resp.status_code,
@@ -154,7 +154,8 @@ class TelegramAPI(TelegramMethods):
 
     async def __aenter__(self) -> Self:
         if self.transport.is_closed:
-            raise RuntimeError(f"{self.__class__.__name__}'s transport is closed")
+            raise RuntimeError(f"{type(self).__name__}'s transport is closed")
+
         return self
 
     async def __aexit__(
@@ -162,5 +163,5 @@ class TelegramAPI(TelegramMethods):
         exc_type: type[BaseException] | None,
         exc: BaseException | None,
         tb: TracebackType | None,
-    ) -> bool | None:
+    ) -> None:
         await self.transport.aclose()
