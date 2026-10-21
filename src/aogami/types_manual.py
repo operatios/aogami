@@ -4,7 +4,10 @@ from pydantic import BaseModel, ConfigDict, Field, model_serializer
 
 
 class TelegramObject(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(
+        frozen=True,
+        defer_build=True,
+    )
 
 
 class InputFile(TelegramObject):
