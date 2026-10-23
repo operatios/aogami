@@ -1,7 +1,7 @@
 [project]
 name = "aogami"
 version = "0.1.0"
-description = "Type-safe Telegram Bot API framework"
+description = "Typed Telegram Bot API client"
 readme = "README.md"
 requires-python = ">=3.14"
 authors = [{ name = "operatios" }]
@@ -25,6 +25,9 @@ dev = [
 requires = ["uv_build>=0.13.0,<0.14.0"]
 build-backend = "uv_build"
 
+[tool.coverage.run]
+omit = ["src/aogami/types.py", "src/aogami/methods.py"]
+
 [tool.ruff.lint]
 extend-select = ["ANN", "PYI"]
 preview = true
@@ -34,3 +37,6 @@ dynamic-function-decorator-return = "error"
 missing-type-argument = "error"
 possibly-unresolved-reference = "warn"
 unsound-return-statement = "error"
+
+[tool.pyrefly]
+preset = "strict"
