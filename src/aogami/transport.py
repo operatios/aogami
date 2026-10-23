@@ -54,13 +54,13 @@ class HttpxTransport:
                 timeout=timeout,
             )
         except HTTPError as exc:
-            raise NetworkError(str(exc), exc) from exc
+            raise NetworkError from exc
 
     async def download(self, url: str) -> bytes:
         try:
             resp = await self.client.get(url)
             resp.raise_for_status()
         except HTTPError as exc:
-            raise NetworkError(str(exc), exc) from exc
+            raise NetworkError from exc
 
         return resp.content

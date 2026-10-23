@@ -1,40 +1,37 @@
+from typing import Final
+
 from aogami.response import ResponseErr
 from aogami.types import File, InputFile, ResponseParameters
 
 
-class AogamiError(Exception): ...
+class AogamiError(Exception):
+    pass
 
 
 class DownloadError(AogamiError):
     def __init__(self, message: str, file: File) -> None:
-        self.file = file
-
         super().__init__(message)
+
+        self.file = file
 
 
 class InputFileTooLarge(AogamiError):
     def __init__(self, message: str, input_file: InputFile) -> None:
-        self.input_file = input_file
-
         super().__init__(message)
+
+        self.input_file = input_file
 
 
 class NetworkError(AogamiError):
-    def __init__(self, message: str, exc: Exception) -> None:
-        self.exc = exc
+    pass
 
+
+class SchemaMismatch(AogamiError):
+    def __init__(self, message: str, status_code: int, content: bytes) -> None:
         super().__init__(message)
 
-
-class ValidationError(AogamiError):
-    def __init__(
-        self, message: str, status_code: int, content: bytes, exc: Exception
-    ) -> None:
         self.status_code = status_code
         self.content = content
-        self.exc = exc
-
-        super().__init__(message)
 
 
 class APIError(AogamiError):
@@ -44,83 +41,78 @@ class APIError(AogamiError):
         error_code: int,
         parameters: ResponseParameters | None = None,
     ) -> None:
-        self.error_code = error_code
+        super().__init__(f"[{error_code}] {description}")
+
         self.description = description
+        self.error_code = error_code
         self.parameters = parameters
-
-        super().__init__(description)
-
-    def __str__(self) -> str:
-        return f"[{self.error_code}] {self.description}"
 
 
 class BadRequest(APIError):
-    """400: BadRequest"""
+    """400"""
 
 
-class MigrateToChat(APIError):
-    """400: BadRequest"""
+class MigrateToChat(BadRequest):
+    def __init__(
+        self, description: str, error_code: int, parameters: ResponseParameters
+    ) -> None:
+        super().__init__(description, error_code, parameters)
 
-    @property
-    def migrate_to_chat_id(self) -> int:
-        assert self.parameters is not None
-        assert self.parameters.migrate_to_chat_id is not None
-
-        return self.parameters.migrate_to_chat_id
+        assert parameters.migrate_to_chat_id is not None
+        self.migrate_to_chat_id = parameters.migrate_to_chat_id
 
 
 class Unauthorized(APIError):
-    """401: Unauthorized"""
+    """401"""
 
 
 class Forbidden(APIError):
-    """403: Forbidden"""
+    """403"""
 
 
 class Conflict(APIError):
-    """409: Conflict"""
+    """409"""
 
 
 class EntityTooLarge(APIError):
-    """413: Request Entity Too Large"""
+    """413"""
 
 
 class RetryAfter(APIError):
-    """429: Too Many Requests"""
+    """429"""
 
-    @property
-    def retry_after(self) -> int:
-        assert self.parameters is not None
-        assert self.parameters.retry_after is not None
+    def __init__(
+        self, description: str, error_code: int, parameters: ResponseParameters
+    ) -> None:
+        super().__init__(description, error_code, parameters)
 
-        return self.parameters.retry_after
+        assert parameters.retry_after is not None
+        self.retry_after: int = parameters.retry_after
 
 
 class ServerError(APIError):
-    """error_code >= 500"""
+    """5xx"""
+
+
+_ERRORS_BY_CODE: Final[dict[int, type[APIError]]] = {
+    400: BadRequest,
+    401: Unauthorized,
+    403: Forbidden,
+    409: Conflict,
+    413: EntityTooLarge,
+}
 
 
 def get_api_error(resp: ResponseErr) -> APIError:
+
     if resp.parameters is not None:
         if resp.parameters.migrate_to_chat_id is not None:
             return MigrateToChat(resp.description, resp.error_code, resp.parameters)
         if resp.parameters.retry_after is not None:
             return RetryAfter(resp.description, resp.error_code, resp.parameters)
 
-    match resp.error_code:
-        case 400:
-            cls = BadRequest
-        case 401:
-            cls = Unauthorized
-        case 403:
-            cls = Forbidden
-        case 409:
-            cls = Conflict
-        case 413:
-            cls = EntityTooLarge
-        case code if code >= 500:
-            cls = ServerError
-        case _:
-            cls = APIError
+    cls = _ERRORS_BY_CODE.get(resp.error_code)
+    if cls is None:
+        cls = ServerError if resp.error_code >= 500 else APIError
 
     return cls(resp.description, resp.error_code, resp.parameters)

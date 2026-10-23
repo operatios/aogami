@@ -1,19 +1,19 @@
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from types import TracebackType
-from typing import Final, Self, cast
+from typing import Final, Self
 
-from pydantic import SecretStr, TypeAdapter
+from pydantic import SecretStr, TypeAdapter, ValidationError
 from typing_extensions import TypeForm
 
 from aogami.exceptions import (
     DownloadError,
     InputFileTooLarge,
-    ValidationError,
+    SchemaMismatch,
     get_api_error,
 )
 from aogami.methods import TelegramMethods
-from aogami.response import Response, get_type_adapter
+from aogami.response import get_type_adapter
 from aogami.transport import FileTypes, HttpxTransport
 from aogami.types import InputFile, TelegramObject
 
@@ -24,10 +24,11 @@ def extract_files(
 
     if isinstance(value, InputFile):
         # TODO: photos have a separate limit
-        max_size = limit_mb * (1000**2)
-        if len(value.content) > max_size:
+        file_size = len(value.content) / (1000**2)
+        if file_size > limit_mb:
             raise InputFileTooLarge(
-                message=f"File is too big (>{limit_mb} MB)", input_file=value
+                message=f"File is too large ({file_size:.0f} MB > {limit_mb} MB)",
+                input_file=value,
             )
 
         if value.filename:
@@ -124,18 +125,15 @@ class TelegramAPI(TelegramMethods):
             **asdict(req),
         )
 
-        # TODO: remove cast if this false positive is fixed upstream
-        # We have to cast here since @cache destroys the function signature
-        adapter = cast(TypeAdapter[Response[T]], get_type_adapter(returns))
+        adapter = get_type_adapter(returns)
 
         try:
             resp = adapter.validate_json(http_resp.content)
         except ValidationError as exc:
-            raise ValidationError(
+            raise SchemaMismatch(
                 message="Telegram API response does not match the expected schema",
                 status_code=http_resp.status_code,
                 content=http_resp.content,
-                exc=exc,
             ) from exc
 
         if not resp.ok:
