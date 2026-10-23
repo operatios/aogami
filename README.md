@@ -1,6 +1,6 @@
 # aogami
 
-A type-safe Telegram Bot API framework for Python.
+Fully typed Telegram Bot API framework for Python.
 
 ## Status
 
@@ -10,7 +10,6 @@ This project is still work in progress. The API surface may change without notic
 
 - Types and methods generated directly from the Telegram Bot API spec
 - Every Telegram object modeled as a pydantic model, with full typing
-- Async client built on top of httpx2
 - Automatic detection and upload of files inside request parameters
 - A typed exception for each Telegram/HTTP error code
 - A `download` helper for downloading files
@@ -112,3 +111,4 @@ uv run tools/generate.py
 Flags:
 - `--refresh` re-downloads the spec instead of using the cached copy
 - `--no-ruff` skips running ruff check and format on the generated files
+- `--stats` outputs API statistics
