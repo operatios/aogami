@@ -7,7 +7,7 @@ from httpx2._types import FileTypes, RequestContent, RequestData
 from aogami.exceptions import NetworkError
 
 
-def extend_read(timeout: Timeout, extra: int | None) -> Timeout:
+def extend_read(timeout: Timeout, extra: float | None) -> Timeout:
     if timeout.read is None or extra is None:
         return timeout
 
@@ -39,7 +39,7 @@ class HttpxTransport:
         data: RequestData | None = None,
         files: Mapping[str, FileTypes] | None = None,
         headers: Mapping[str, str] | None = None,
-        extra_read_timeout: int | None = None,
+        extra_read_timeout: float | None = None,
     ) -> HttpxResponse:
 
         timeout = extend_read(self.client.timeout, extra_read_timeout)

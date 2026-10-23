@@ -1,7 +1,7 @@
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from types import TracebackType
-from typing import Final, Self
+from typing import Final, Self, override
 
 from pydantic import SecretStr, TypeAdapter, ValidationError
 from typing_extensions import TypeForm
@@ -13,7 +13,7 @@ from aogami.exceptions import (
     get_api_error,
 )
 from aogami.methods import TelegramMethods
-from aogami.response import get_type_adapter
+from aogami.response import ResponseErr, get_type_adapter
 from aogami.transport import FileTypes, HttpxTransport
 from aogami.types import InputFile, TelegramObject
 
@@ -99,6 +99,7 @@ class TelegramAPI(TelegramMethods):
         )
         self.token = token
 
+    @override
     async def method[T](
         self, name: str, returns: TypeForm[T], /, **params: object
     ) -> T:
@@ -136,7 +137,7 @@ class TelegramAPI(TelegramMethods):
                 content=http_resp.content,
             ) from exc
 
-        if not resp.ok:
+        if isinstance(resp, ResponseErr):
             raise get_api_error(resp)
 
         return resp.result

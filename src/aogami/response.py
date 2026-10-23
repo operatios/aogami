@@ -27,5 +27,8 @@ type Response[T] = Annotated[ResponseOk[T] | ResponseErr, Field(discriminator="o
 
 @cache
 def get_type_adapter[T](type_: TypeForm[T]) -> TypeAdapter[Response[T]]:
-    # TODO: stop ignoring once this false positive is fixed upstream
-    return TypeAdapter(Response[type_])  # ty: ignore[invalid-type-form]
+    # TODO: stop ignoring once this gets fixed
+
+    # ty: ignore[invalid-type-form]
+    # pyrefly: ignore[not-a-type]
+    return TypeAdapter(Response[type_])
