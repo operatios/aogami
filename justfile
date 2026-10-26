@@ -1,5 +1,9 @@
-test:
-    uv run pytest --cov --cov-report=term-missing --cov-report=html
+test *ARGS:
+	uv run coverage run -m pytest tests {{ARGS}}
+
+coverage:
+	uv run coverage report
+	uv run coverage html
 
 check:
     pyrefly check src

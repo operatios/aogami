@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 authors = [{ name = "operatios" }]
 dependencies = [
+  "coverage>=7.17.0",
   "httpx2>=2.10.0",
   "pydantic>=2.13.4",
 ]
@@ -16,7 +17,6 @@ dev = [
   "pydantic-settings>=2.15.0",
   "pytest>=9.1.1",
   "pytest-asyncio>=1.4.0",
-  "pytest-cov>=7.1.0",
   "socksio>=1.0.0",
   "typed-argument-parser>=1.12.0",
 ]
