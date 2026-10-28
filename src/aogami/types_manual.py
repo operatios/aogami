@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_serializer
 class TelegramObject(BaseModel):
     model_config = ConfigDict(
         frozen=True,
-        defer_build=True,
+        defer_build=False,  # NOTE: set to False because FastAPI doesn't support it
     )
 
 
