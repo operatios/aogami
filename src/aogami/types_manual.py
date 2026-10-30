@@ -1,6 +1,8 @@
+from typing import override
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_serializer
+from pydantic._internal import _repr
 
 
 class TelegramObject(BaseModel):
@@ -8,6 +10,10 @@ class TelegramObject(BaseModel):
         frozen=True,
         defer_build=False,  # NOTE: set to False because FastAPI doesn't support it
     )
+
+    @override
+    def __repr_args__(self) -> _repr.ReprArgs:
+        return [(k, v) for k, v in super().__repr_args__() if v is not None]
 
 
 class InputFile(TelegramObject):
