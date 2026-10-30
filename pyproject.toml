@@ -6,13 +6,13 @@ readme = "README.md"
 requires-python = ">=3.14"
 authors = [{ name = "operatios" }]
 dependencies = [
-  "coverage>=7.17.0",
   "httpx2>=2.10.0",
   "pydantic>=2.13.4",
 ]
 
 [dependency-groups]
 dev = [
+  "coverage>=7.17.0",
   "mako>=1.4.1",
   "pydantic-settings>=2.15.0",
   "pytest>=9.1.1",
@@ -26,7 +26,12 @@ requires = ["uv_build>=0.13.0,<0.14.0"]
 build-backend = "uv_build"
 
 [tool.coverage.run]
+source = ["src"]
+branch = true
 omit = ["src/aogami/types.py", "src/aogami/methods.py"]
+
+[tool.pyrefly]
+preset = "strict"
 
 [tool.ruff.lint]
 extend-select = ["ANN", "PYI"]
@@ -37,6 +42,3 @@ dynamic-function-decorator-return = "error"
 missing-type-argument = "error"
 possibly-unresolved-reference = "warn"
 unsound-return-statement = "error"
-
-[tool.pyrefly]
-preset = "strict"
