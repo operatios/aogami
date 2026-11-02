@@ -27,7 +27,7 @@ class TelegramMethods:
         % endif
     ) -> ${m.type_hint}:
         """
-${m.get_docstring()}
+${m.get_docstring(2)}
         """
         params = {
             % for f in m.fields:

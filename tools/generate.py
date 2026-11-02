@@ -33,6 +33,7 @@ TELEGRAM_SCALAR_TYPES: Final = {
     "String": "str",
 }
 DOCSTRING_WIDTH: Final = 88
+TAB: Final = " " * 4
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,13 @@ def wrap_paragraphs(
             initial_indent=initial_indent,
             subsequent_indent=subsequent_indent,
         )
+
+
+def to_pascal_case(string: str) -> str:
+    if not string:
+        return string
+
+    return string[0].upper() + string[1:]
 
 
 def to_snake_case(string: str) -> str:
@@ -108,7 +116,7 @@ class TypeInfo(BaseInfo):
     def get_docstring(self) -> str:
         if not self.description:
             return "No description"
-        return "\n".join(wrap_paragraphs(self.description, " " * 4, " " * 4))
+        return "\n".join(wrap_paragraphs(self.description, TAB, TAB))
 
 
 class MethodInfo(BaseInfo):
@@ -119,6 +127,10 @@ class MethodInfo(BaseInfo):
         return to_snake_case(self.name)
 
     @property
+    def webhook_name(self) -> str:
+        return to_pascal_case(self.name)
+
+    @property
     def type_hint(self) -> str:
         return " | ".join(self.returns)
 
@@ -126,15 +138,17 @@ class MethodInfo(BaseInfo):
     def sorted_fields(self) -> list[FieldInfo]:
         return sorted(self.fields, key=lambda f: not f.required)
 
-    def get_docstring(self) -> str:
+    def get_docstring(self, level: int) -> str:
         if not self.fields:
-            return "\n".join(wrap_paragraphs(self.description, " " * 8, " " * 8))
+            return "\n".join(
+                wrap_paragraphs(self.description, TAB * level, TAB * level)
+            )
 
         paragraphs = self.description + ["\n", "Args:"]
-        docstring = list(wrap_paragraphs(paragraphs, " " * 8, " " * 8))
+        docstring = list(wrap_paragraphs(paragraphs, TAB * level, TAB * level))
 
         args = [f"{f.name} ({f.type_hint}): {f.description}" for f in self.fields]
-        docstring += wrap_paragraphs(args, " " * 12, " " * 16)
+        docstring += wrap_paragraphs(args, TAB * (level + 1),  TAB * (level + 2))
         return "\n".join(docstring)
 
 
@@ -199,13 +213,24 @@ class APISpec(BaseModel):
     changelog: HttpUrl
 
     def find_union_discriminator(self, subtypes: list[str]) -> str | None:
-        for discriminator in ("source", "status", "type"):
+
+        for disc in ("source", "status", "type"):
+            literals = []
+
             for type_info in (self.types.get(i) for i in subtypes):
                 if not type_info:
                     break
-                if discriminator not in {field.name for field in type_info.fields}:
+
+                if disc not in {field.name for field in type_info.fields}:
                     break
+
+                # InlineQueryResult* don't allow discriminator use because they share
+                # the same tag value for cached and con-cached variants
+                literals.extend(f.literal for f in type_info.fields if f.name == disc)
             else:
+                if len(set(literals)) != len(literals):
+                    return
+
                 """
                 class Foo(BaseModel):
                     from_: Literal["foo"] = Field(alias="from")
@@ -220,7 +245,7 @@ class APISpec(BaseModel):
                 """
 
                 # Field discriminator needs to be the python attribute name ^
-                return escape_keyword(discriminator)
+                return escape_keyword(disc)
 
 
 def get_spec(refresh: bool = False) -> str:
@@ -257,6 +282,7 @@ def main(args: Args) -> None:
     for filename in (
         "methods.py.mako",
         "types.py.mako",
+        "webhook_methods.py.mako",
     ):
         template = lookup.get_template(filename)
         code = template.render(spec=spec)

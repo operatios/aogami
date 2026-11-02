@@ -10287,7 +10287,7 @@ class InlineQueryResultsButton(TelegramObject):
     """
 
 
-type InlineQueryResult = Annotated[
+type InlineQueryResult = (
     InlineQueryResultCachedAudio
     | InlineQueryResultCachedDocument
     | InlineQueryResultCachedGif
@@ -10307,9 +10307,8 @@ type InlineQueryResult = Annotated[
     | InlineQueryResultPhoto
     | InlineQueryResultVenue
     | InlineQueryResultVideo
-    | InlineQueryResultVoice,
-    Field(discriminator="type"),
-]
+    | InlineQueryResultVoice
+)
 
 
 class InlineQueryResultArticle(TelegramObject):

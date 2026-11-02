@@ -1,7 +1,13 @@
 from typing import override
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, model_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    model_serializer,
+)
 from pydantic._internal import _repr
 
 
@@ -14,6 +20,13 @@ class TelegramObject(BaseModel):
     @override
     def __repr_args__(self) -> _repr.ReprArgs:
         return [(k, v) for k, v in super().__repr_args__() if v is not None]
+
+
+class WebhookResponse(TelegramObject):
+    @model_serializer(mode="wrap")
+    def _drop_none(self, handler: SerializerFunctionWrapHandler) -> dict[str, object]:
+        serialized = handler(self)
+        return {k: v for k, v in serialized.items() if v is not None}
 
 
 class InputFile(TelegramObject):
