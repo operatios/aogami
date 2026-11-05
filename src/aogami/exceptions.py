@@ -9,10 +9,13 @@ class AogamiError(Exception):
 
 
 class DownloadError(AogamiError):
-    def __init__(self, message: str, file: File) -> None:
+    def __init__(
+        self, message: str, file: File, status_code: int | None = None
+    ) -> None:
         super().__init__(message)
 
         self.file = file
+        self.status_code = status_code
 
 
 class InputFileTooLarge(AogamiError):

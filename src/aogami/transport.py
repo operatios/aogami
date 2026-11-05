@@ -22,7 +22,11 @@ def extend_read(timeout: Timeout, extra: float | None) -> Timeout:
 class HttpxTransport:
     def __init__(self, base_url: str, proxy: str | None = None) -> None:
         # TODO: http2=True
-        self.client = AsyncClient(base_url=base_url, proxy=proxy)
+        self.client = AsyncClient(
+            base_url=base_url,
+            proxy=proxy,
+            timeout=Timeout(connect=5.0, read=30.0, write=30.0, pool=10.0),
+        )
 
     async def aclose(self) -> None:
         await self.client.aclose()
@@ -56,11 +60,8 @@ class HttpxTransport:
         except HTTPError as exc:
             raise NetworkError from exc
 
-    async def download(self, url: str) -> bytes:
+    async def download(self, url: str) -> HttpxResponse:
         try:
-            resp = await self.client.get(url)
-            resp.raise_for_status()
+            return await self.client.get(url)
         except HTTPError as exc:
-            raise NetworkError from exc
-
-        return resp.content
+            raise NetworkError(f"{type(exc).__name__}: {exc}") from exc

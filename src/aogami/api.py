@@ -147,9 +147,17 @@ class TelegramAPI(TelegramMethods):
         if not file.file_path:
             raise DownloadError("File path missing from file", file=file)
 
-        return await self.transport.download(
+        resp = await self.transport.download(
             f"/file/bot{self.token.get_secret_value()}/{file.file_path}"
         )
+        if not resp.is_success:
+            raise DownloadError(
+                f"Download failed with HTTP {resp.status_code}",
+                file=file,
+                status_code=resp.status_code,
+            )
+
+        return resp.content
 
     async def __aenter__(self) -> Self:
         if self.transport.is_closed:
